@@ -2,7 +2,15 @@ import json
 from models.user import User
 from models.alert import Alert, PriceTargetAlert, PercentTargetAlert, ArbitrageAlert, SpreadAlert, P2PMerchantAlert
 from pathlib import Path
-DATA_FILE = Path('data/users.json')
+import os
+
+DATA_FILE = "data/users.json"
+
+os.makedirs("data", exist_ok=True)
+
+if not os.path.exists(DATA_FILE):
+    with open(DATA_FILE, 'w') as f:
+        json.dump({}, f)
 
 
 

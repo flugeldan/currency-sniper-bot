@@ -1,0 +1,107 @@
+# handlers/keyboards.py
+from aiogram.types import ReplyKeyboardMarkup, KeyboardButton
+from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton
+from aiogram.types import CallbackQuery
+keyboard = ReplyKeyboardMarkup(
+    keyboard=[
+        [KeyboardButton(text="📊 Текущие курсы"), KeyboardButton(text="🎯 Мои алерты")],
+        [KeyboardButton(text="➕ Создать алерт")],
+        [KeyboardButton(text="🥇 Топ P2P мерчантов"), KeyboardButton(text="🔍 Как пользоваться")],
+    ],
+    resize_keyboard=True
+)
+
+exchange_keyboard = ReplyKeyboardMarkup(
+    keyboard=[[KeyboardButton(text="Все площадки 🌐 (в будущем)")],
+        [KeyboardButton(text="📈 Binance")],
+        [KeyboardButton(text="❌ Отмена")],
+
+
+    ],
+    resize_keyboard=True
+)
+
+
+listing_keyboard = ReplyKeyboardMarkup(
+    keyboard=[
+        [KeyboardButton(text="📈 Binance")],
+        [KeyboardButton(text="📈 Bybit")],
+        [KeyboardButton(text="❌ Отмена")]
+
+
+    ],
+    resize_keyboard=True
+)
+
+alert_types_keyboard = ReplyKeyboardMarkup(
+    keyboard=[
+        [KeyboardButton(text="💵 Курс доллара (НБК)"), KeyboardButton(text="📊 P2P ордера")],
+        [KeyboardButton(text="👤 P2P мерчанты"), KeyboardButton(text="📈 Арбитраж")],
+        [KeyboardButton(text="❌ Отмена")]
+    ],
+    resize_keyboard=True
+)
+
+alert_types_keyboard_p2p = ReplyKeyboardMarkup(
+    keyboard=[
+        [KeyboardButton(text="Изменение в процентах %"), KeyboardButton(text="Цена по P2P ордерам 💸")],
+    ],
+    resize_keyboard=True
+)
+
+p2p_buy_sell_choosing_keyboard = ReplyKeyboardMarkup(
+    keyboard=[
+        [KeyboardButton(text="Продажа 💲"), KeyboardButton(text="Покупка 🛒")],
+    ],
+    resize_keyboard=True
+)
+
+p2p_up_down_keyboard = ReplyKeyboardMarkup(
+    keyboard=[
+        [KeyboardButton(text="Рост ⬆️"), KeyboardButton(text="Падение ⬇️")],
+    ],
+    resize_keyboard=True
+)
+
+banks_keyboard = InlineKeyboardMarkup(
+    inline_keyboard=[
+        [
+            InlineKeyboardButton(text="Kaspi", callback_data="bank_kaspi"),
+            InlineKeyboardButton(text="Freedom", callback_data="bank_freedom"),
+            InlineKeyboardButton(text="Halyk", callback_data="bank_halyk"),
+        ],
+        [
+            InlineKeyboardButton(text="Дальше ➡️", callback_data="banks_next"),
+            InlineKeyboardButton(text="❌ Отмена", callback_data="banks_cancel"),
+        ]
+    ]
+)
+
+BANKS = [("Kaspi", "kaspi"), ("Freedom", "freedom"), ("Halyk", "halyk")]
+
+def build_banks_keyboard(selected: set) -> InlineKeyboardMarkup:
+    buttons = []
+
+    for name, key in BANKS:
+        text = f"✅ {name}" if key in selected else name
+        buttons.append(InlineKeyboardButton(text = text, callback_data=f"bank_{key}"))
+
+    return InlineKeyboardMarkup(inline_keyboard=[buttons, [
+            InlineKeyboardButton(text="Дальше ➡️", callback_data="banks_next"),
+            InlineKeyboardButton(text="❌ Отмена", callback_data="banks_cancel"),
+        ]
+    ])
+
+def swipe_sellers_buyers(current_page: int):
+    buttons = []
+
+    if current_page == 0:
+        buttons.append(InlineKeyboardButton(text = "➡️", callback_data="merchants_next"))
+    else:
+        buttons.append(InlineKeyboardButton(text="◀️", callback_data="merchants_prev"))
+    
+    return InlineKeyboardMarkup(inline_keyboard=[buttons])
+
+
+
+    

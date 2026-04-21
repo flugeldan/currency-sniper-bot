@@ -2,6 +2,11 @@
 from aiogram.types import ReplyKeyboardMarkup, KeyboardButton
 from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton
 from aiogram.types import CallbackQuery
+from aiogram.filters.callback_data import CallbackData
+class AlertCallback(CallbackData, prefix="alert"):
+    action: str # delete, delete_all, toggle
+    alert_id: str
+
 keyboard = ReplyKeyboardMarkup(
     keyboard=[
         [KeyboardButton(text="📊 Текущие курсы"), KeyboardButton(text="🎯 Мои алерты")],
@@ -101,6 +106,45 @@ def swipe_sellers_buyers(current_page: int):
         buttons.append(InlineKeyboardButton(text="◀️", callback_data="merchants_prev"))
     
     return InlineKeyboardMarkup(inline_keyboard=[buttons])
+
+def swipe_alerts_keyboard(alerts: list, current_page: int, total_pages: int):
+    page_first_alert_index = current_page * 5
+    alert_page = alerts[page_first_alert_index:page_first_alert_index + 5]
+    nav_buttons, delete_buttons = [], []
+    toggle_buttons = []
+    for i, alert in enumerate(alert_page, page_first_alert_index + 1):
+        icon = "🔔" if alert.active else "🔕"
+        toggle_buttons.append(
+            InlineKeyboardButton(
+                text=f"{icon} {i}",
+                callback_data=AlertCallback(action="toggle", alert_id=alert.alert_id).pack()
+                ))
+
+
+    if current_page < total_pages - 1:
+        InlineKeyboardButton(text="➡️", callback_data=AlertCallback(action="next", alert_id="none").pack())
+    
+    if current_page > 0:
+        InlineKeyboardButton(text="◀️", callback_data=AlertCallback(action="prev", alert_id="none").pack())
+
+    for i, alert in enumerate(alert_page, page_first_alert_index + 1):
+        delete_buttons.append(InlineKeyboardButton(text=f"🗑 {i}", callback_data=AlertCallback(action="delete", alert_id=alert.alert_id).pack()))
+
+    rows = [nav_buttons, toggle_buttons, delete_buttons] if nav_buttons else [toggle_buttons,delete_buttons]
+    rows.append(InlineKeyboardButton(text="🧹 Очистить все", callback_data=AlertCallback(action="delete_all", alert_id="all").pack()))
+
+
+    return InlineKeyboardMarkup(inline_keyboard=rows)
+
+
+
+
+
+    
+
+
+
+
 
 
 

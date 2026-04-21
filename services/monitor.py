@@ -128,6 +128,9 @@ async def monitor_loop(bot: Bot):
             if binance_info:
                  prices["binance_sell"] = float(binance_info[0][0]['price'])
                  prices["binance_buy"] = float(binance_info[1][0]['price'])
+            if bybit_info:
+                 prices["bybit_sell"] = float(bybit_info[0][0]['price'])
+                 prices["bybit_buy"] = float(bybit_info[1][0]['price'])
 
             
             # 2. загружаем юзеров

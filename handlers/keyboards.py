@@ -17,17 +17,6 @@ keyboard = ReplyKeyboardMarkup(
 )
 
 exchange_keyboard = ReplyKeyboardMarkup(
-    keyboard=[[KeyboardButton(text="Все площадки 🌐 (в будущем)")],
-        [KeyboardButton(text="📈 Binance")],
-        [KeyboardButton(text="❌ Отмена")],
-
-
-    ],
-    resize_keyboard=True
-)
-
-
-listing_keyboard = ReplyKeyboardMarkup(
     keyboard=[
         [KeyboardButton(text="📈 Binance")],
         [KeyboardButton(text="📈 Bybit")],
@@ -38,14 +27,21 @@ listing_keyboard = ReplyKeyboardMarkup(
     resize_keyboard=True
 )
 
+
+
 alert_types_keyboard = ReplyKeyboardMarkup(
     keyboard=[
         [KeyboardButton(text="💵 Курс доллара (НБК)"), KeyboardButton(text="📊 P2P ордера")],
-        [KeyboardButton(text="👤 P2P мерчанты"), KeyboardButton(text="📈 Арбитраж")],
+        [KeyboardButton(text="👤 P2P мерчанты"), KeyboardButton(text="📈 Арбитраж (в разработке)")],
         [KeyboardButton(text="❌ Отмена")]
     ],
     resize_keyboard=True
 )
+cancel_keyboard = ReplyKeyboardMarkup(
+    keyboard=[
+        [KeyboardButton(text="❌ Отмена")]
+    ],
+    resize_keyboard=True)
 
 alert_types_keyboard_p2p = ReplyKeyboardMarkup(
     keyboard=[
@@ -67,6 +63,18 @@ p2p_up_down_keyboard = ReplyKeyboardMarkup(
     ],
     resize_keyboard=True
 )
+
+listing_keyboard = ReplyKeyboardMarkup(
+    keyboard=[
+        [KeyboardButton(text="📈 Binance")],
+        [KeyboardButton(text="📈 Bybit")],
+        [KeyboardButton(text="❌ Отмена")]
+
+
+    ],
+    resize_keyboard=True
+)
+
 
 banks_keyboard = InlineKeyboardMarkup(
     inline_keyboard=[

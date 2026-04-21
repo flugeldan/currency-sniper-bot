@@ -3,7 +3,7 @@ from aiogram.fsm.context import FSMContext
 from aiogram.types import ReplyKeyboardMarkup, KeyboardButton
 from aiogram.types import Message, InlineKeyboardMarkup, InlineKeyboardButton
 from models.user import User
-from handlers.keyboards import keyboard, exchange_keyboard, alert_types_keyboard, alert_types_keyboard_p2p, p2p_buy_sell_choosing_keyboard, p2p_up_down_keyboard, build_banks_keyboard, banks_keyboard, listing_keyboard, swipe_sellers_buyers, swipe_alerts_keyboard
+from handlers.keyboards import keyboard, exchange_keyboard, alert_types_keyboard, alert_types_keyboard_p2p, p2p_buy_sell_choosing_keyboard, p2p_up_down_keyboard, build_banks_keyboard, banks_keyboard, listing_keyboard, swipe_sellers_buyers, swipe_alerts_keyboard, cancel_keyboard
 from handlers.keyboards import AlertCallback
 from services.cache import get_cache
 from models.alert import PriceTargetAlert, PercentTargetAlert, P2PMerchantAlert
@@ -129,6 +129,12 @@ async def create_p2p_merchant_alert(alert_data: dict, cache: dict, user: dict):
             place = "binance_sell"
         else:
             place = "binance_buy"
+    elif alert_data["exchange"] == "bybit":
+        if alert_data["buy_sell"] == "sell":
+            place = "bybit_sell"
+        else:
+            place = "bybit_buy"
+
     alert = P2PMerchantAlert(
         user_id=user.telegram_user_id,
         active=True,
@@ -293,7 +299,10 @@ async def showing_binance_merchants(message: Message, state: FSMContext):
     cache = get_cache()
     binance_sellers = cache["binance_info"][0]
     
-    await message.answer(merchants_page_text(...), reply_markup=swipe_sellers_buyers(0), parse_mode="HTML", disable_web_page_preview=True)
+    await message.answer(
+        merchants_page_text(binance_sellers, "binance", "sell"),
+        reply_markup=swipe_sellers_buyers(0),parse_mode="HTML",
+        disable_web_page_preview=True)
 @router.message(ListingMerchants.choosing_exchange, F.text == "📈 Bybit")
 async def showing_binance_merchants(message: Message, state: FSMContext):
 
@@ -350,19 +359,6 @@ async def merchants_prev_page(callback: CallbackQuery, state: FSMContext):
     
 
     
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 
 
@@ -436,8 +432,16 @@ async def p2p_down(message: Message, state: FSMContext):
 
 
 @router.message(AlertCreation.choosing_exchange, F.text == "📈 Binance")
-async def chosing_p2p_type(message: Message, state: FSMContext):
+async def chosing_p2p_type_binance(message: Message, state: FSMContext):
     await state.update_data(exchange = "binance")
+
+    await state.set_state(AlertCreation.choosing_sell_buy_p2p)
+
+    await message.answer("Введите тип объявления продажа/покупка: ", reply_markup=p2p_buy_sell_choosing_keyboard)
+
+@router.message(AlertCreation.choosing_exchange, F.text == "📈 Binance")
+async def chosing_p2p_type_bybit(message: Message, state: FSMContext):
+    await state.update_data(exchange = "bybit")
 
     await state.set_state(AlertCreation.choosing_sell_buy_p2p)
 
@@ -457,7 +461,7 @@ async def p2p_type_buy(message: Message, state: FSMContext):
 
     await state.set_state(AlertCreation.entering_params)
 
-    await message.answer("Введите желаемую цену/процент: ")
+    await message.answer("Введите желаемую цену/процент: ", reply_markup=cancel_keyboard)
 
 
 @router.message(AlertCreation.entering_params)
@@ -504,12 +508,22 @@ async def start_p2p_merchants_alert(message: Message, state: FSMContext):
 
 @router.message(AlertCreation.choosing_exchange_for_merchant, F.text == "📈 Binance")
 #надо будет добавить хэндлер специально для all в будущем
-async def choosing_exchange_p2p_merchant(message: Message, state: FSMContext):
+async def choosing_exchange_p2p_merchant_binance(message: Message, state: FSMContext):
     await state.update_data(exchange="binance")
 
     await state.set_state(AlertCreation.choosing_sell_buy_p2p_merchant)
     
     await message.answer("Мерчант должен продавать/покупать: ", reply_markup=p2p_buy_sell_choosing_keyboard)
+
+@router.message(AlertCreation.choosing_exchange_for_merchant, F.text == "📈 Bybit")
+async def choosing_exchange_p2p_bybit(message: Message, state: FSMContext):
+    await state.update_data(exchange="bybit")
+
+    await state.set_state(AlertCreation.choosing_sell_buy_p2p_merchant)
+    
+    await message.answer("Мерчант должен продавать/покупать: ", reply_markup=p2p_buy_sell_choosing_keyboard)
+
+
 
 @router.message(AlertCreation.choosing_sell_buy_p2p_merchant, F.text == "Продажа 💲")
 async def p2p_merchant_sell(message: Message, state: FSMContext):

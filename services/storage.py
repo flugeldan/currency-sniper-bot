@@ -21,11 +21,24 @@ def dict_to_alert(data: dict):
          
 
     elif data['type'] == 'P2PMerchantAlert':
-        alert = P2PMerchantAlert(data['user_id'], data['active'], data['zone_percent'],  data['minimum_completed_orders'], data['completion_rate'], data['exchange'], data['required_banks'], data['arb_type'])
-        
+        alert = P2PMerchantAlert(
+            data['user_id'],
+            data['active'],
+            data['zone_percent'],
+            data['minimum_completed_orders'],
+            data['completion_rate'],
+            data['exchange'],
+            data['required_banks'])
     
     elif data['type'] == 'ArbitrageAlert':
-        alert = ArbitrageAlert(data['user_id'], data['active'], data['zone_percent'],  data['goal_spread'], data['last_triggered_spread'], data['last_triggered_spread_price'])
+        alert = ArbitrageAlert(
+            data['user_id'],
+            data['active'],
+            data['zone_percent'],
+            data['goal_spread'],
+            data['arb_type'])
+        alert.last_triggered_spread = data.get('last_triggered_spread', None)
+        alert.last_triggered_spread_price = data.get('last_triggered_spread_price', None)
     
     elif data['type'] == 'SpreadAlert':
         alert = SpreadAlert(data['user_id'], data['active'], data['zone_percent'], data['goal_spread'], data['bank'], data['exchange_place'])

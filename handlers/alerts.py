@@ -293,8 +293,7 @@ async def showing_binance_merchants(message: Message, state: FSMContext):
     cache = get_cache()
     binance_sellers = cache["binance_info"][0]
     
-    await message.answer(merchants_page_text(binance_sellers, "binance", "sell"), reply_markup=swipe_sellers_buyers(0, parse_mode="HTML"), disable_web_page_preview=True)
-
+    await message.answer(merchants_page_text(...), reply_markup=swipe_sellers_buyers(0), parse_mode="HTML", disable_web_page_preview=True)
 @router.message(ListingMerchants.choosing_exchange, F.text == "📈 Bybit")
 async def showing_binance_merchants(message: Message, state: FSMContext):
 

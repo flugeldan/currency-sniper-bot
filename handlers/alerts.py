@@ -94,15 +94,22 @@ async def create_percent_target_alert(alert_data: dict, cache: dict, user: User)
     current_price = None
 
     if alert_data["exchange"] == "nbk":
-        current_price = cache["nbk_price"]
+        current_price = float(cache["nbk_price"])
         place = "nbk"
     elif alert_data["exchange"] == "binance":
         if alert_data["buy_sell"] == "sell":
-            current_price = cache["binance_info"][0][0]["price"]
+            current_price = float(cache["binance_info"][0][0]["price"])
             place = "binance_sell"
         else:
-            current_price = cache["binance_info"][1][0]["price"]
+            current_price = float(cache["binance_info"][1][0]["price"])
             place = "binance_buy"
+    elif alert_data["exchange"] == "bybit":
+        if alert_data["buy_sell"] == "sell":
+            current_price = float(cache["bybit_info"][0][0]["price"])
+            place = "bybit_sell"
+        else:
+            current_price = float(cache["bybit_info"][1][0]["price"])
+            place = "bybit_buy"
     
 
 
@@ -180,6 +187,7 @@ async def swipe_next_page_alerts(callback: CallbackQuery, state: FSMContext):
         show_alerts_page(user.alerts, cur_page, total_pages),
         reply_markup=swipe_alerts_keyboard(user.alerts, cur_page, total_pages),
         parse_mode="HTML")
+    await state.update_data(cur_page=cur_page)
 
     await callback.answer()
 
@@ -193,6 +201,7 @@ async def swipe_next_page_alerts(callback: CallbackQuery, state: FSMContext):
         show_alerts_page(user.alerts, cur_page, total_pages),
         reply_markup=swipe_alerts_keyboard(user.alerts, cur_page, total_pages),
         parse_mode="HTML")
+    await state.update_data(cur_page=cur_page)
 
     await callback.answer()
 
@@ -377,14 +386,14 @@ async def merchants_prev_page(callback: CallbackQuery, state: FSMContext):
 
 @router.message(F.text == "💵 Курс доллара (НБК)")
 async def start_price_alert_nbk(message: Message, state: FSMContext):
-    # 1. сохрани тип алерта в state
+
     await state.update_data(alert_type = "price_target")
 
     await state.update_data(exchange = "nbk")
-    # 2. переведи в состояние choosing_place
+
     await state.set_state(AlertCreation.entering_params)
 
-    # 3. спроси у пользователя цену
+    
     await message.answer("Введите желаемую цену/процент ", reply_markup=keyboard)
 
 
@@ -407,28 +416,11 @@ async def p2p_alert_percent_target(message: Message, state: FSMContext):
 
     await state.update_data(alert_type = "percent_target")
 
-    await state.set_state(AlertCreation.up_down)
-
-    await message.answer("Рост/падение: ↕️ ", reply_markup=p2p_up_down_keyboard)
-
-
-
-@router.message(AlertCreation.up_down, F.text == "Рост ⬆️")
-async def p2p_up(message: Message, state: FSMContext):
-    await state.update_data(direction = "up")
-
     await state.set_state(AlertCreation.choosing_exchange)
 
-    await message.answer("Выберите плошадку:", reply_markup=exchange_keyboard)
+    await message.answer("Выберите площадку:  ", reply_markup=exchange_keyboard)
 
 
-@router.message(AlertCreation.up_down, F.text == "Падение ⬇️")
-async def p2p_down(message: Message, state: FSMContext):
-    await state.update_data(direction = "down")
-
-    await state.set_state(AlertCreation.choosing_exchange)
-
-    await message.answer("Выберите плошадку:", reply_markup=exchange_keyboard)
 
 
 @router.message(AlertCreation.choosing_exchange, F.text == "📈 Binance")
@@ -439,7 +431,7 @@ async def chosing_p2p_type_binance(message: Message, state: FSMContext):
 
     await message.answer("Введите тип объявления продажа/покупка: ", reply_markup=p2p_buy_sell_choosing_keyboard)
 
-@router.message(AlertCreation.choosing_exchange, F.text == "📈 Binance")
+@router.message(AlertCreation.choosing_exchange, F.text == "📈 Bybit")
 async def chosing_p2p_type_bybit(message: Message, state: FSMContext):
     await state.update_data(exchange = "bybit")
 
@@ -449,7 +441,7 @@ async def chosing_p2p_type_bybit(message: Message, state: FSMContext):
 
 @router.message(AlertCreation.choosing_sell_buy_p2p, F.text == "Продажа 💲")
 async def p2p_type_sell(message: Message, state: FSMContext):
-    await state.update_data(buy_sell = "sell")
+    await state.update_data(buy_sell = "sell", direction="down")
 
     await state.set_state(AlertCreation.entering_params)
 
@@ -457,7 +449,7 @@ async def p2p_type_sell(message: Message, state: FSMContext):
 
 @router.message(AlertCreation.choosing_sell_buy_p2p, F.text == "Покупка 🛒")
 async def p2p_type_buy(message: Message, state: FSMContext):
-    await state.update_data(buy_sell = "buy")
+    await state.update_data(buy_sell = "buy", direction="up")
 
     await state.set_state(AlertCreation.entering_params)
 

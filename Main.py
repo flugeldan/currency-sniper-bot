@@ -8,6 +8,8 @@ from handlers.alerts import router as alerts_router
 from services.database import get_pool
 from repository.user_repository import UserRepository
 from middlewares.repo_middleware import RepoMiddleware
+from services.logger import setup_logger
+setup_logger()
 
 async def main():
     bot = Bot(token=TOKEN)

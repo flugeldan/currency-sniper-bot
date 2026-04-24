@@ -7,6 +7,8 @@ from services.analyzer import (calculate_arbitrage, filter_best_merchants,
                                 check_price_target, check_percent_target, is_outside_zone, is_cooldown_passed, is_outside_zone_by_spread)
 from datetime import datetime, timedelta
 from services.cache import update_cache, get_cache
+from services.logger import get_logger
+logger = get_logger(__name__)
 
 async def check_price_target_alert(alert, prices, bot) -> bool:
     current_price = prices.get(alert.place)
@@ -118,7 +120,7 @@ async def monitor_loop(bot: Bot, repo: UserRepository):
 
             update_cache(current_nbk_price, binance_info, bybit_info)
             if binance_info is None and current_nbk_price is None and bybit_info is None:
-                 print("Все источники недоступны, пропускаем итерацию")
+                 logger.error(f"Ошибка монитора: {e}", exc_info=True)
                  await asyncio.sleep(60)
                  continue
             
@@ -171,6 +173,6 @@ async def monitor_loop(bot: Bot, repo: UserRepository):
                 
                         
         except Exception as e:
-            print(f"Ошибка монитора: {e}")
+            logger.error(f"Ошибка монитора: {e}", exc_info=True)
         
         await asyncio.sleep(60)

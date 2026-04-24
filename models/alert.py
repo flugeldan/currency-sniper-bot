@@ -9,7 +9,7 @@ class Alert():
         self.user_id = user_id
         self.active = active
         self.zone_percent = zone_percent
-        self.created_at = created_at or datetime.now().isoformat()
+        self.created_at = created_at if isinstance(created_at, datetime) else datetime.now()
         self.last_triggered_price = last_triggered_price
         self.last_triggered_at = last_triggered_at
 

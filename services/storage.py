@@ -25,7 +25,7 @@ def alert_to_row(alert: Alert):
             
         
         elif isinstance(alert, P2PMerchantAlert):
-            data = {'minimum_completed_orders':alert.minimum_completed_orders,' completion_rate':alert.completion_rate, 'exchange':alert.exchange, 'required_banks':alert.required_banks}
+            data = {'minimum_completed_orders':alert.minimum_completed_orders,'completion_rate':alert.completion_rate, 'exchange':alert.exchange, 'required_banks':alert.required_banks}
 
         elif isinstance(alert, ArbitrageAlert):
             data = {'goal_spread': alert.goal_spread, 'arb_type': alert.arb_type, 'last_triggered_spread':alert.last_triggered_spread, 'last_triggered_spread_price': alert.last_triggered_spread_price}
@@ -35,9 +35,8 @@ def alert_to_row(alert: Alert):
         else:
             raise ValueError(f"Неизвестный тип: {type(alert).__name__}")
         
-        created_at = datetime.fromisoformat(alert.created_at)
-        last_triggered_at = datetime.fromisoformat(alert.last_triggered_at) if alert.last_triggered_at else None
-        
+        created_at = alert.created_at
+        last_triggered_at = alert.last_triggered_at
 
         
         
@@ -70,20 +69,20 @@ async def clear_alerts(conn: Connection, telegram_user_id: str):
 async def load_users(conn: Connection):
     pool = await get_pool()
 
-    async with pool.acquire() as conn:
-        users_db = await conn.fetch("SELECT * FROM users")
-        alerts_db = await conn.fetch("SELECT * FROM alerts")
+   
+    users_db = await conn.fetch("SELECT * FROM users")
+    alerts_db = await conn.fetch("SELECT * FROM alerts")
 
-        users = []
-        alerts = defaultdict(list)
-        for row in alerts_db:
-                alerts[row["user_id"]].append(row_to_alert(row))
+    users = []
+    alerts = defaultdict(list)
+    for row in alerts_db:
+        alerts[row["user_id"]].append(row_to_alert(row))
 
-        for us in users_db:
-            user = User(us["username"], us["telegram_user_id"], str(us["first_joined"]), alerts[us["telegram_user_id"]])
-
-            users.append(user)
-        return users
+    for us in users_db:
+        
+        user = User(us["username"], us["telegram_user_id"], str(us["first_joined"]), alerts[us["telegram_user_id"]])
+        users.append(user)
+    return users
     
 
     
@@ -107,7 +106,12 @@ def row_to_alert(row: dict):
     alert = None
     alert_type = row["type"]
     data = row["data"]
-    alert_id, user_id, active, zone_percent, created_at, last_triggered_price, last_triggered_at = row["alert_id"], row["user_id"], row["active"], row["zone_percent"], row["created_at"], row["last_triggered_price"], row["last_triggered_at"]
+    if isinstance(data, str):
+        data = json.loads(data)
+
+    alert_id, user_id, active, zone_percent, last_triggered_price = str(row["alert_id"]), row["user_id"], row["active"], row["zone_percent"],row["last_triggered_price"]
+    created_at = row["created_at"]  # datetime объект от asyncpg
+    last_triggered_at = row["last_triggered_at"]  # datetime или None
     if alert_type == "PriceTargetAlert":
         alert = PriceTargetAlert(alert_id=alert_id, user_id=user_id, active=active, zone_percent=zone_percent, created_at=created_at, last_triggered_price=last_triggered_price, last_triggered_at=last_triggered_at, price_target=data["price_target"], place=data["place"], direction= data["direction"])
     elif alert_type == "PercentTargetAlert":

@@ -2,6 +2,8 @@ import xml.etree.ElementTree as ET
 import aiohttp
 import asyncio
 from typing import Optional
+from services.logger import get_logger
+logger = get_logger(__name__)
 
 
 async def get_bybit_p2p_rate() -> Optional[tuple]:
@@ -27,7 +29,7 @@ async def get_bybit_p2p_rate() -> Optional[tuple]:
             _bybit_parser(buyers_info["result"]["items"])
         )
     except Exception as e:
-        print(f"Ошибка Bybit: {e}")
+        logger.error(f"Ошибка фетчера (bybit): {e}", exc_info=True)
         return None
 
 
@@ -80,7 +82,7 @@ async def get_nbk_rate(currency: str = "USD") -> Optional[float]:
                 return rate / quant #возвращает цену за 1 в тенге
         return None #если нбк не дал эту валюту, но юзеру я дам выбор строгий чтобы он не присылал нонсенс в валюте
     except Exception as e:
-        print(f"Ошибка при получении курса НБК: {e}")
+        logger.error(f"Ошибка фетчера (nbk): {e}", exc_info=True)
         return None
         
 def merchant_parser(data: dict) -> list:
@@ -137,7 +139,7 @@ async def get_binance_p2p_rate():
 
     
     except Exception as e:
-        print(f"Ошибка: {e}")
+        logger.error(f"Ошибка фетчера (binance): {e}", exc_info=True)
 
         
 

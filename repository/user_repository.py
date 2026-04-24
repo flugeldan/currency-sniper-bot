@@ -33,11 +33,12 @@ class UserRepository:
         if self._cache:
             return list(self._cache.values())
         
-        users = await db_load_users()
-
+        async with self.pool.acquire() as conn:
+            users = await db_load_users(conn)
+        
         for user in users:
             self._cache[user.telegram_user_id] = user
-    
+            
         return list(self._cache.values())
     
     async def clear_alerts(self, telegram_user_id: str):

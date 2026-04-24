@@ -2,155 +2,158 @@ import json
 from models.user import User
 from models.alert import Alert, PriceTargetAlert, PercentTargetAlert, ArbitrageAlert, SpreadAlert, P2PMerchantAlert
 from pathlib import Path
-DATA_FILE = Path('data/users.json')
+from asyncpg import Connection
+from services.database import get_pool
+from collections import defaultdict
+from datetime import datetime
 
 
 
-def dict_to_alert(data: dict):
-    #из словаря жсон обратно в объект алерта
-    if data['type'] == 'PriceTargetAlert':
-        alert = PriceTargetAlert(data['user_id'], data['active'], data['zone_percent'], data['price_target'], data['place'], 0.0)
-        alert.direction = data['direction']
 
-    elif data['type'] == 'PercentTargetAlert':
-         
-         alert = PercentTargetAlert(data['user_id'], data['active'], data['zone_percent'], 
-                               data['direction'], data['percent_target'], data['place'],
-                               data.get('initial_price', 0.0))
-         
-         
 
-    elif data['type'] == 'P2PMerchantAlert':
-        alert = P2PMerchantAlert(
-            data['user_id'],
-            data['active'],
-            data['zone_percent'],
-            data['minimum_completed_orders'],
-            data['completion_rate'],
-            data['exchange'],
-            data['required_banks'])
     
-    elif data['type'] == 'ArbitrageAlert':
-        alert = ArbitrageAlert(
-            data['user_id'],
-            data['active'],
-            data['zone_percent'],
-            data['goal_spread'],
-            data['arb_type'])
-        alert.last_triggered_spread = data.get('last_triggered_spread', None)
-        alert.last_triggered_spread_price = data.get('last_triggered_spread_price', None)
-    
-    elif data['type'] == 'SpreadAlert':
-        alert = SpreadAlert(data['user_id'], data['active'], data['zone_percent'], data['goal_spread'], data['bank'], data['exchange_place'])
+def alert_to_row(alert: Alert):
+        #алерт данные алерта для инсерта в таблицу алертов
 
-    else:
-        raise ValueError(f"Неизвестный тип алерта: {data['type']}")
-    alert.alert_id = data['alert_id']
-    alert.created_at = data['created_at']
-    alert.last_triggered_price = data.get('last_triggered_price', None)
-    alert.last_triggered_at = data.get('last_triggered_at', None)
-
-    return alert
-
-
-def dict_to_user(user: dict):
-    #из жсон юзера обратно в объект юзера
-    newUser = User(user['username'], user['telegram_user_id'])
-    newUser.first_joined = user['first_joined']
-    newUser.alerts = [dict_to_alert(x) for x in user['alerts']]
-    return newUser
-    
-def alert_to_dict(alert):
-        #алерт в словарь жсон
-        
-        base = {
-            'alert_id': alert.alert_id,
-            'user_id': alert.user_id,
-            'active': alert.active,
-            'zone_percent': alert.zone_percent,
-            'created_at': alert.created_at,
-            'type': type(alert).__name__,  # сохраняем имя класса
-            'last_triggered_price': alert.last_triggered_price,
-            'last_triggered_at': alert.last_triggered_at
-            }
         
         if isinstance(alert, PriceTargetAlert):
-            base['price_target'] = alert.price_target
-            base['place'] = alert.place
-            base['direction'] = alert.direction
+            data = {'price_target': alert.price_target, 'place': alert.place, 'direction': alert.direction}
             
 
         elif isinstance(alert, PercentTargetAlert):
-            base['direction'] = alert.direction
-            base['percent_target'] = alert.percent_target
-            base['place'] = alert.place
-            base['initial_price'] = alert.initial_price
+            data = {'direction': alert.direction, 'percent_target': alert.percent_target, 'place': alert.place, 'initial_price': alert.initial_price}
             
         
         elif isinstance(alert, P2PMerchantAlert):
-            base['minimum_completed_orders'] = alert.minimum_completed_orders
-            base['completion_rate'] = alert.completion_rate
-            base['exchange'] = alert.exchange 
-            base['required_banks'] = alert.required_banks
+            data = {'minimum_completed_orders':alert.minimum_completed_orders,' completion_rate':alert.completion_rate, 'exchange':alert.exchange, 'required_banks':alert.required_banks}
 
         elif isinstance(alert, ArbitrageAlert):
-            base['goal_spread'] = alert.goal_spread
-            base['arb_type'] = alert.arb_type
-            base['last_triggered_spread'] = alert.last_triggered_spread
-            base['last_triggered_spread_price'] = alert.last_triggered_spread_price
+            data = {'goal_spread': alert.goal_spread, 'arb_type': alert.arb_type, 'last_triggered_spread':alert.last_triggered_spread, 'last_triggered_spread_price': alert.last_triggered_spread_price}
 
         elif isinstance(alert, SpreadAlert):
-            base['goal_spread'] = alert.goal_spread
-            base['bank'] = alert.bank
-            base['exchange_place'] = alert.exchange_place
-        return base
+            data = {'goal_spread': alert.goal_spread, 'bank': alert.bank, 'exchange_place': alert.exchange_place}
+        else:
+            raise ValueError(f"Неизвестный тип: {type(alert).__name__}")
+        
+        created_at = datetime.fromisoformat(alert.created_at)
+        last_triggered_at = datetime.fromisoformat(alert.last_triggered_at) if alert.last_triggered_at else None
+        
+
+        
+        
+        return (alert.alert_id, alert.user_id, alert.active, alert.zone_percent, 
+        created_at, type(alert).__name__, alert.last_triggered_price, 
+        last_triggered_at, json.dumps(data))
+
+async def save_alert(conn: Connection, alert: Alert):
+    await conn.execute("""
+                       INSERT INTO alerts (alert_id, user_id, active, zone_percent, created_at, type, last_triggered_price, last_triggered_at, data) 
+                       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+                       ON CONFLICT (alert_id) DO UPDATE SET
+                       active = EXCLUDED.active,
+                       last_triggered_price = EXCLUDED.last_triggered_price,
+                       last_triggered_at = EXCLUDED.last_triggered_at,
+                       data = EXCLUDED.data
+                       """, *alert_to_row(alert))
+
+async def delete_alert(conn: Connection, alert: Alert):
+    await conn.execute("DELETE FROM alerts WHERE alert_id = $1", alert.alert_id)
+
+async def clear_alerts(conn: Connection, telegram_user_id: str):
+    await conn.execute("DELETE FROM alerts WHERE user_id = $1", telegram_user_id)
 
 
 
-def user_to_dict(user) -> dict:
-    #из юзера в словарь, алерты список словарей параметров алерта
-    return {
-        'username': user.username,
-        'telegram_user_id': user.telegram_user_id,
-        'first_joined': user.first_joined,
-        'alerts': [alert_to_dict(a) for a in user.alerts]
-    }
-def load_users() -> dict:
-    # если файл не существует — вернуть пустой словарь
-    # иначе прочитать и вернуть содержимое
 
-    if not DATA_FILE.exists():
-        return {}
-    try:
-        with open(DATA_FILE, "r", encoding="utf-8") as f:
-            return json.load(f)
-    except Exception as e:
-        print(f"Ошибка чтения users.json: {e}")
-        return {}
+
+
+async def load_users(conn: Connection):
+    pool = await get_pool()
+
+    async with pool.acquire() as conn:
+        users_db = await conn.fetch("SELECT * FROM users")
+        alerts_db = await conn.fetch("SELECT * FROM alerts")
+
+        users = []
+        alerts = defaultdict(list)
+        for row in alerts_db:
+                alerts[row["user_id"]].append(row_to_alert(row))
+
+        for us in users_db:
+            user = User(us["username"], us["telegram_user_id"], str(us["first_joined"]), alerts[us["telegram_user_id"]])
+
+            users.append(user)
+        return users
     
 
-def save_users(users: dict) -> None:
-    with open(DATA_FILE, 'w', encoding='utf-8') as f:
-        json.dump(users, f, indent=4)
-
-
-
-
     
-def save_user(user: User) -> None:
-    users = load_users()
-    users[user.telegram_user_id] = user_to_dict(user)
-    save_users(users)
-
-def get_user(telegram_user_id: str, username: str = ""):
-    users = load_users()
-    if telegram_user_id in users:
-        newUser = dict_to_user(users[telegram_user_id])
-        return newUser
-    else:
-        newUser = User(username, telegram_user_id)
-        save_user(newUser)
-        return newUser
+    
 
 
+
+
+async def save_user(conn: Connection, user: User):
+    await conn.execute("""INSERT INTO users(telegram_user_id, username) 
+                       VALUES ($1, $2)
+                       ON CONFLICT (telegram_user_id) DO UPDATE SET
+                       username = EXCLUDED.username
+                       """, user.telegram_user_id, user.username)
+    
+
+
+
+
+def row_to_alert(row: dict):
+    alert = None
+    alert_type = row["type"]
+    data = row["data"]
+    alert_id, user_id, active, zone_percent, created_at, last_triggered_price, last_triggered_at = row["alert_id"], row["user_id"], row["active"], row["zone_percent"], row["created_at"], row["last_triggered_price"], row["last_triggered_at"]
+    if alert_type == "PriceTargetAlert":
+        alert = PriceTargetAlert(alert_id=alert_id, user_id=user_id, active=active, zone_percent=zone_percent, created_at=created_at, last_triggered_price=last_triggered_price, last_triggered_at=last_triggered_at, price_target=data["price_target"], place=data["place"], direction= data["direction"])
+    elif alert_type == "PercentTargetAlert":
+        alert = PercentTargetAlert(alert_id=alert_id, user_id=user_id, active=active, zone_percent=zone_percent, created_at=created_at, last_triggered_price=last_triggered_price, last_triggered_at=last_triggered_at, direction=data["direction"], percent_target=data["percent_target"], place=data["place"], initial_price=data["initial_price"])
+    elif alert_type == "P2PMerchantAlert":
+        alert = P2PMerchantAlert(alert_id=alert_id, user_id=user_id, active=active, zone_percent=zone_percent, created_at=created_at, last_triggered_price=last_triggered_price, last_triggered_at=last_triggered_at, minimum_completed_orders=data["minimum_completed_orders"], completion_rate=data["completion_rate"], exchange=data["exchange"], required_banks=data["required_banks"])
+    elif alert_type == "ArbitrageAlert":
+        #допишу потом когда будет окх и я сам сделаю арбитраж нормальный с добавлением новых фич
+        pass 
+    elif alert_type == "SpreadAlert":
+        #та же логика как и сверху
+        pass
+    return alert
+
+
+
+
+async def get_alerts(conn: Connection, telegram_user_id: str):
+    
+    rows = await conn.fetch("SELECT * from alerts where user_id = $1", telegram_user_id)
+    alerts = []
+    for row in rows:
+        alert = row_to_alert(row)
+
+        if alert is not None:
+            alerts.append(alert)
+
+    return alerts
+
+
+
+
+async def get_user(telegram_user_id: str, username: str = ""):
+    pool = await get_pool()
+    async with pool.acquire() as conn:
+        user_row = await conn.fetchrow("SELECT * from users where telegram_user_id = $1", telegram_user_id)
+
+        if user_row:
+            user = User(username=user_row["username"], telegram_user_id=user_row["telegram_user_id"], first_joined=str(user_row["first_joined"]))
+            # момент с загружением алертов как я понял на будущую функцию
+            user.alerts = await get_alerts(conn, telegram_user_id)
+        else:
+            await conn.execute("INSERT INTO users (telegram_user_id, username) VALUES ($1, $2)", telegram_user_id, username) #в таблийе дб по дефолту now уже есть для джойнед
+            user = User(telegram_user_id=telegram_user_id, username=username)
+        return user
+        
+
+            
 

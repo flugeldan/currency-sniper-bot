@@ -1,7 +1,7 @@
 import asyncio
 from aiogram import Bot
 from services.fetcher import get_nbk_rate, get_binance_p2p_rate, get_bybit_p2p_rate
-from services.storage import load_users, save_user, dict_to_user, get_user
+from repository.user_repository import UserRepository
 from models.alert import PriceTargetAlert, PercentTargetAlert, ArbitrageAlert, SpreadAlert, P2PMerchantAlert
 from services.analyzer import (calculate_arbitrage, filter_best_merchants, 
                                 check_price_target, check_percent_target, is_outside_zone, is_cooldown_passed, is_outside_zone_by_spread)
@@ -108,7 +108,7 @@ async def check_arbitrage_alert(alert, prices, binance_info, current_nbk_price, 
         
     return False
     
-async def monitor_loop(bot: Bot):
+async def monitor_loop(bot: Bot, repo: UserRepository):
     while True:
         try:
             # 1. получаем данные
@@ -123,6 +123,8 @@ async def monitor_loop(bot: Bot):
                  continue
             
             prices = {}
+            users = await repo.get_all_users()
+
             if current_nbk_price:
                 prices["nbk"] = current_nbk_price
             if binance_info:
@@ -133,12 +135,9 @@ async def monitor_loop(bot: Bot):
                  prices["bybit_buy"] = float(bybit_info[1][0]['price'])
 
             
-            # 2. загружаем юзеров
-            users = load_users()
-            users_as_objects = [dict_to_user(u) for u in users.values()]
             
             # 3. проверяем алерты
-            for user in users_as_objects:
+            for user in users:
                 user_alers =  user.alerts
                 user_changed = False
 
@@ -161,13 +160,15 @@ async def monitor_loop(bot: Bot):
                     elif isinstance(alert, SpreadAlert):
                         changed = False
                         pass
+                    
+                    else:
+                        changed = False
 
                     if changed == True:
-                        user_changed = True
+                        await repo.save_alert(alert)
                     #переделал в моменте арбитраж алерт, из за этого спред алерт чуть бесполезен, наверное сделаю из него чисто сборщик спредов между криптобиржами, или реальными обменниками/нбк?
 
-                if user_changed:
-                    save_user(user)
+                
                         
         except Exception as e:
             print(f"Ошибка монитора: {e}")

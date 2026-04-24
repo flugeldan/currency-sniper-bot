@@ -70,4 +70,3 @@ python Main.py
 ## Автор
 
 telegram: reidalreadytaken
-made 

@@ -7,10 +7,10 @@ from handlers.keyboards import keyboard, exchange_keyboard, alert_types_keyboard
 from handlers.keyboards import AlertCallback
 from services.cache import get_cache
 from models.alert import PriceTargetAlert, PercentTargetAlert, P2PMerchantAlert
-from services.storage import get_user, save_user
 from aiogram import Router, F
 from aiogram.types import CallbackQuery
 from aiogram.exceptions import TelegramBadRequest
+from repository.user_repository import UserRepository #чисто для тайпхинтов
 
 
 
@@ -50,11 +50,6 @@ class SwipingAlerts(StatesGroup):
     swiping_pages = State()
 
 
-    
-
-     
-
-
 
 
 @router.message(F.text == "❌ Отмена")
@@ -64,7 +59,7 @@ async def cancel(message: Message, state: FSMContext):
 
 
 #создание уведов
-async def create_price_target_alert(alert_data: dict, cache: dict, user: User):
+async def create_price_target_alert(alert_data: dict, repo: UserRepository, cache: dict, user: User):
     current_price = None
     if alert_data["exchange"] == "nbk":
         current_price = cache["nbk_price"]
@@ -87,10 +82,10 @@ async def create_price_target_alert(alert_data: dict, cache: dict, user: User):
         )
 
     user.alerts.append(alert)
-    save_user(user)
+    await repo.save_alert(alert)
 
 
-async def create_percent_target_alert(alert_data: dict, cache: dict, user: User):
+async def create_percent_target_alert(alert_data: dict, repo: UserRepository, cache: dict, user: User):
     current_price = None
 
     if alert_data["exchange"] == "nbk":
@@ -122,12 +117,11 @@ async def create_percent_target_alert(alert_data: dict, cache: dict, user: User)
         initial_price=current_price)
     
     user.alerts.append(alert)
-
-    save_user(user)
+    await repo.save_alert(alert)
 
     return True
 
-async def create_p2p_merchant_alert(alert_data: dict, cache: dict, user: dict):
+async def create_p2p_merchant_alert(alert_data: dict,repo: UserRepository, cache: dict, user: dict):
 
     if alert_data["exchange"] == "all":
         pass 
@@ -154,16 +148,18 @@ async def create_p2p_merchant_alert(alert_data: dict, cache: dict, user: dict):
 
 
     user.alerts.append(alert)
-    save_user(user)
+    await repo.save_alert(alert)
 #хэндлеры
 
 
 @router.message(F.text == "🎯 Мои алерты")
-async def show_user_alerts(message: Message, state: FSMContext):
+async def show_user_alerts(message: Message, state: FSMContext, repo: UserRepository):
     await state.set_state(SwipingAlerts.swiping_pages)
 
     telegram_user_id = str(message.from_user.id)
-    user_alerts = get_user(telegram_user_id).alerts
+    user = await repo.get_user(telegram_user_id, message.from_user.username or "")
+    user_alerts = user.alerts
+
 
     if not user_alerts:
         await message.answer("У вас нету активных объявлений")
@@ -178,9 +174,9 @@ async def show_user_alerts(message: Message, state: FSMContext):
     await message.answer(show_alerts_page(user_alerts, 0, total_pages), reply_markup=swipe_alerts_keyboard(user_alerts, 0, total_pages), parse_mode="HTML")
 
 @router.callback_query(AlertCallback.filter(F.action == "next"))
-async def swipe_next_page_alerts(callback: CallbackQuery, state: FSMContext):
+async def swipe_next_page_alerts(callback: CallbackQuery, state: FSMContext, repo: UserRepository):
     data = await state.get_data()
-    user = get_user(str(callback.from_user.id))
+    user = await repo.get_user(str(callback.from_user.id), callback.from_user.username or "")
     cur_page, total_pages = data["cur_page"] + 1, data["total_pages"]
 
     await callback.message.edit_text(
@@ -192,9 +188,9 @@ async def swipe_next_page_alerts(callback: CallbackQuery, state: FSMContext):
     await callback.answer()
 
 @router.callback_query(AlertCallback.filter(F.action == "prev"))
-async def swipe_next_page_alerts(callback: CallbackQuery, state: FSMContext):
+async def swipe_next_page_alerts(callback: CallbackQuery, state: FSMContext, repo: UserRepository):
     data = await state.get_data()
-    user = get_user(str(callback.from_user.id))
+    user = await repo.get_user(str(callback.from_user.id), callback.from_user.username or "")
     cur_page, total_pages = data["cur_page"] - 1, data["total_pages"]
 
     await callback.message.edit_text(
@@ -208,10 +204,10 @@ async def swipe_next_page_alerts(callback: CallbackQuery, state: FSMContext):
 
 
 @router.callback_query(AlertCallback.filter(F.action == "delete_all"))
-async def clear_all_alerts(callback: CallbackQuery, state: FSMContext):
-    user = get_user(str(callback.from_user.id))
-    user.clear_alerts()
-    save_user(user)
+async def clear_all_alerts(callback: CallbackQuery, state: FSMContext, repo: UserRepository):
+    user = await repo.get_user(str(callback.from_user.id), callback.from_user.username or "")
+
+    await repo.clear_alerts(str(callback.from_user.id))
     
     await callback.message.edit_text("🧹 Все алерты удалены")
     await state.clear()
@@ -223,15 +219,16 @@ async def clear_all_alerts(callback: CallbackQuery, state: FSMContext):
 # aiogram автоматически десериализует строку "alert:delete:uuid" в объект AlertCallback
 # callback_data: AlertCallback — готовый объект с атрибутами action и alert_id
 
-async def remove_alert(callback: CallbackQuery, callback_data: AlertCallback, state: FSMContext):
-    user = get_user(str(callback.from_user.id))
+async def remove_alert(callback: CallbackQuery, callback_data: AlertCallback, state: FSMContext, repo: UserRepository):
+    user = await repo.get_user(str(callback.from_user.id), callback.from_user.username or "")
     alert = next((a for a in user.alerts if a.alert_id == callback_data.alert_id), None)
+    user
     if alert is None:
         await state.clear()
         await callback.answer("⚠️ Алерт уже удалён", show_alert=True)
         return
     user.remove_alert(alert)
-    save_user(user)
+    await repo.delete_alert(alert)
 
     
     if not user.alerts:
@@ -259,8 +256,8 @@ async def remove_alert(callback: CallbackQuery, callback_data: AlertCallback, st
 
 @router.callback_query(AlertCallback.filter(F.action == "toggle"))
 
-async def toggle_alert(callback: CallbackQuery, callback_data: AlertCallback, state: FSMContext):
-    user = get_user(str(callback.from_user.id))
+async def toggle_alert(callback: CallbackQuery, callback_data: AlertCallback, state: FSMContext, repo: UserRepository):
+    user = await repo.get_user(str(callback.from_user.id), callback.from_user.username or "")
     alert = next((a for a in user.alerts if a.alert_id == callback_data.alert_id), None)
 
     if alert is None:
@@ -268,7 +265,8 @@ async def toggle_alert(callback: CallbackQuery, callback_data: AlertCallback, st
         await callback.answer("⚠️ Алерт уже удалён", show_alert=True)
         return
     user.toggle_alert(alert.alert_id)
-    save_user(user)
+
+    await repo.save_alert(alert)
 
 
     
@@ -386,10 +384,11 @@ async def merchants_prev_page(callback: CallbackQuery, state: FSMContext):
 
 @router.message(F.text == "💵 Курс доллара (НБК)")
 async def start_price_alert_nbk(message: Message, state: FSMContext):
+    
 
     await state.update_data(alert_type = "price_target")
-
     await state.update_data(exchange = "nbk")
+    await state.update_data(username=message.from_user.username or "")
 
     await state.set_state(AlertCreation.entering_params)
 
@@ -400,6 +399,8 @@ async def start_price_alert_nbk(message: Message, state: FSMContext):
 @router.message(F.text == "📊 P2P ордера")
 async def start_p2p_alert_creation(message: Message, state: FSMContext):
     await message.answer("Введите тип уведомления: ", reply_markup=alert_types_keyboard_p2p)
+
+    await state.update_data(username=message.from_user.username or "")
 
     await state.set_state(AlertCreation.choosing_type)
 
@@ -493,6 +494,7 @@ async def start_p2p_merchants_alert(message: Message, state: FSMContext):
     await state.update_data(alert_type="p2p_merchant")
 
     await state.update_data(user_id = str(message.from_user.id))
+    await state.update_data(username=message.from_user.username or "")
 
     await state.set_state(AlertCreation.choosing_exchange_for_merchant)
     
@@ -605,18 +607,18 @@ async def toggle_bank(callback: CallbackQuery, state: FSMContext):
 @router.callback_query(
     AlertCreation.entering_required_banks_p2p_merchant,
     F.data == "banks_next")
-async def banks_next(callback: CallbackQuery, state: FSMContext):
+async def banks_next(callback: CallbackQuery, state: FSMContext, repo: UserRepository):
 
     alert_data = await state.get_data()
     cache = get_cache()
-    user = get_user(alert_data["user_id"])
 
+    user = await repo.get_user(alert_data["user_id"], alert_data.get("username", ""))
     if not alert_data.get("selected_banks", []):
         await callback.answer("⚠️ Выбери хотя бы один банк!", show_alert=True)
         return
 
     try:
-        await create_p2p_merchant_alert(alert_data, cache, user)
+        await create_p2p_merchant_alert(alert_data,repo, cache, user)
     
     except ValueError as e:
         await state.clear()
@@ -656,7 +658,7 @@ async def banks_cancel(callback: CallbackQuery, state: FSMContext):
 
 
 @router.message(AlertCreation.entering_zone)
-async def enter_zone(message: Message, state: FSMContext):
+async def enter_zone(message: Message, state: FSMContext, repo: UserRepository):
 
     try:
         zone = float(message.text)
@@ -669,15 +671,15 @@ async def enter_zone(message: Message, state: FSMContext):
     alert_info = await state.get_data()
     cache = get_cache()
 
-    user = get_user(str(message.from_user.id))
+    user = await repo.get_user(str(message.from_user.id), message.from_user.username or "")
 
         
     
     try:
         if alert_info["alert_type"] == "price_target":
-            await create_price_target_alert(alert_info, cache, user)
+            await create_price_target_alert(alert_info, repo, cache, user)
         else:
-            await create_percent_target_alert(alert_info, cache, user)
+            await create_percent_target_alert(alert_info, repo, cache, user)
     except ValueError as e:
         await state.clear()
         await message.answer(f"❌ {e}. Попробуйте позже.", reply_markup=keyboard)

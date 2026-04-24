@@ -2,7 +2,6 @@ from aiogram.types import ReplyKeyboardMarkup, KeyboardButton
 from aiogram.filters import CommandStart
 from aiogram import F, Router
 from aiogram.types import Message, InlineKeyboardMarkup, InlineKeyboardButton
-from services.storage import get_user
 from services.fetcher import get_nbk_rate, get_binance_p2p_rate
 from services.analyzer import calculate_arbitrage
 from services.cache import get_cache
@@ -12,14 +11,15 @@ from models.alert import PriceTargetAlert, PercentTargetAlert, ArbitrageAlert, S
 from handlers.alerts import AlertCreation, cancel
 from handlers.keyboards import keyboard, exchange_keyboard, alert_types_keyboard
 from aiogram.fsm.context import FSMContext
+from repository.user_repository import UserRepository #чисто для тайпхинтов
 from texts import FAQ_TEXT
 router = Router()
 
 
 
 @router.message(CommandStart())
-async def cmd_start(message: Message):
-    get_user(str(message.from_user.id), message.from_user.username or "")
+async def cmd_start(message: Message, repo: UserRepository):
+    await repo.get_user(str(message.from_user.id), message.from_user.username or "")
     await message.answer("Здравствуй, я телеграм бот по снайпу выгодных спредов валют", reply_markup=keyboard)
 
 

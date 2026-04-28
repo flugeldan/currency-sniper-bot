@@ -1,5 +1,6 @@
 # 💱 Currency Sniper Bot
 Telegram-бот для мониторинга P2P курсов USDT/KZT на Binance и Bybit с системой алертов и аналитикой спредов.
+Данный проект создавался как final project для универа 
 
 ## Что умеет
 - 📊 Актуальные P2P курсы Binance и Bybit в реальном времени
@@ -78,9 +79,6 @@ python Main.py
 ```
 
 ## Планы
-- [ ] Redis для FSM storage и rate limiting
-- [ ] Переход на event-driven архитектуру мониторинга
-- [ ] Tiered scheduling (price/percent → merchant → arbitrage)
 - [ ] Добавление OKX после деплоя на европейский сервер
 - [ ] Арбитражные алерты между биржами
 - [ ] CI/CD через GitHub Actions
